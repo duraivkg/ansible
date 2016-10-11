@@ -1,0 +1,29 @@
+---
+# defaults file for utilities/shell
+python_interpreter: "/usr/bin/env python"
+local_workspace_param: /tmp/ws/utilities/shell/
+remote_workspace_param: /opt/local/jenkins/.ws/utilities/shell/
+local_workspace: "{{ local_workspace_param }}/{{ timestamp }}"
+remote_workspace: "{{ remote_workspace_param }}/{{ timestamp }}"
+util_shell_pkg_list_csv:  "tree"
+util_shell_pkg_list: "{{ util_shell_pkg_list_csv.split(',') }}"
+util_shell_as_caller: "hostname"
+util_shell_process_log_fn: "test.log"
+util_shell_process_log_file: "/tmp/{{ util_shell_process_log_fn }}"
+util_shell_cp_file_src_offset_dir: "/tmp"
+util_shell_cp_file_src_pattern: "*.sh"
+util_shell_cp_files: False
+util_shell_cp_out_file_list_pattern: "*.sh"
+util_shell_cp_out_file_offset_dir: "{{ remote_workspace }}"
+util_shell_cp_out_files: False
+util_shell_publish_to_s3: False
+util_shell_s3_file_offset_dir: "{{ local_workspace }}"
+util_shell_s3_object: "{{ util_shell_s3_object_dir }}/{{ util_shell_build_id }}/{{ util_shell_s3_src_fn }}"
+util_shell_s3_file_list_pattern: "*.log"
+util_shell_s3_bucket: "ws"
+util_shell_s3_object_dir: "others"
+util_shell_build_id: "latest"
+util_shell_s3_src_file: "{{ item[0].path }}"
+util_shell_s3_src_fn: "{{ item[1].stdout_lines[0] }}"
+util_shell_delete_remote_ws: "False"
+util_shell_become: "no"

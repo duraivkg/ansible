@@ -1,0 +1,45 @@
+---
+# defaults file for s3/b2b_sync
+local_workspace_param: /tmp/ansible_ws/aws/s3/b2b_sync
+remote_workspace_param: /opt/local/ansible_ws/aws/s3/b2b_sync
+local_workspace: "{{ local_workspace_param }}/{{ timestamp }}"
+remote_workspace: "{{ remote_workspace_param }}/{{ timestamp }}"
+global_log_dir: "/opt/local/logs/ansible/"
+global_log_file: "{{ global_log_dir }}/{{ s3_sync_bs_log_fn }}"
+build_id: "na"
+app_user: "ansible"
+app_group: "ansible"
+s3_sync_bs: "aws_s3_sync_b2b.sh"
+s3_sync_bs_arg_src_bucket: "sync-test-src"
+s3_sync_bs_arg_tgt_bucket: "sync-test-tgt"
+s3_sync_bs_arg_tgt_info_mode: "dynamic"
+s3_sync_bs_arg_sync_forks: "2"
+s3_sync_bs_arg_tgt_bucket_dir: "NA"
+s3_sync_bs_arg_sleep_timer: "15"
+s3_sync_bs_arg_extra_vars: "NA"
+s3_sync_bs_arg_wait: "yes"
+s3_sync_bs_arg_tag_archive: "archive_target"
+s3_sync_bs_arg_workspace: "{{ remote_workspace }}"
+s3_sync_bs_arg_aws_caller: "aws"
+s3_sync_bs_caller: "sh {{ s3_sync_bs }} --workspace {{ s3_sync_bs_arg_workspace }} --src_bucket {{ s3_sync_bs_arg_src_bucket }} --target_bucket {{ s3_sync_bs_arg_tgt_bucket }} --target_info_mode {{ s3_sync_bs_arg_tgt_info_mode }} --sync_forks {{ s3_sync_bs_arg_sync_forks }} --target_bucket_dir {{ s3_sync_bs_arg_tgt_bucket_dir }}  --sleep_timer {{ s3_sync_bs_arg_sleep_timer }} --extra_vars {{ s3_sync_bs_arg_extra_vars }} --wait {{ s3_sync_bs_arg_wait }} --tag_archive {{ s3_sync_bs_arg_tag_archive }} --aws_caller {{ s3_sync_bs_arg_aws_caller }}"
+s3_sync_bs_log_fn: "aws_s3_sync_b2b.log"
+s3_sync_bs_log_file: "{{ s3_sync_bs_arg_workspace }}/aws_s3_sync_b2b/logs/{{ s3_sync_bs_log_fn }}"
+s3_sync_bs_global_caller: "sh {{ s3_sync_bs }} --src_bucket {{ item.bs_arg_src_bucket }} --target_bucket {{ item.bs_arg_tgt_bucket }} --target_info_mode {{ item.bs_arg_tgt_info_mode }} --sync_forks {{ item.bs_arg_sync_forks }} --target_bucket_dir {{ item.bs_arg_tgt_bucket_dir }}  --sleep_timer {{ item.bs_arg_sleep_timer }} --extra_vars {{ item.bs_arg_extra_vars }} --wait {{item.bs_arg_wait }} --tag_archive {{ item.bs_arg_tag_archive }} --aws_caller {{ item.bs_arg_aws_caller }}"
+s3_sync_b2b_list_global: "False"
+
+s3_sync_b2b_list:
+    - name: "tbd"
+
+# please use the global vars file located under ansible/vars/aws/rds/s3/*b2b*.yml to drive the env specific rds dump
+#s3_sync_b2b_list:
+#    - name: "sync-test"
+#      bs_arg_src_bucket: "sync-test-src"
+#      bs_arg_tgt_bucket: "sync-test-tgt"
+#      bs_arg_tgt_info_mode: "dynamic"
+#      bs_arg_sync_forks: "2"
+#      bs_arg_tgt_bucket_dir: "new_3"
+#      bs_arg_sleep_timer: "15"
+#      bs_arg_extra_vars: "NA"
+#      bs_arg_wait: "no"
+#      bs_arg_tag_archive: "archive_target"
+#      bs_arg_aws_caller: "aws"

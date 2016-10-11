@@ -1,0 +1,18 @@
+---
+# defaults file for health_checks/app_endpoint
+app_end_points:
+  - name: "maintenance_app"
+    end_point: "https://192.168.33.13/api"
+    validate_certs: "no"
+    method: "POST"
+    timeout: 1
+    status_code: 503
+    enabled: True
+
+  - name: "maintenance_app"
+    end_point: "https://192.168.33.13/api"
+    validate_certs: "no"
+    method: "GET"
+    timeout: 1
+    status_code: 503
+    enabled: True

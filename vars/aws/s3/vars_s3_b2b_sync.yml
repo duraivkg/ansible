@@ -1,0 +1,14 @@
+---
+# vars file for aws/rds/dump
+s3_sync_b2b_list:
+    - name: "sync-test"
+      bs_arg_src_bucket: "sync-test-src"
+      bs_arg_tgt_bucket: "sync-test-tgt"
+      bs_arg_tgt_info_mode: "dynamic"
+      bs_arg_sync_forks: "2"
+      bs_arg_tgt_bucket_dir: "new_3"
+      bs_arg_sleep_timer: "15"
+      bs_arg_extra_vars: "NA"
+      bs_arg_wait: "no"
+      bs_arg_tag_archive: "archive_target"
+      bs_arg_aws_caller: "aws"

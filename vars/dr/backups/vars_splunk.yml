@@ -1,0 +1,9 @@
+---
+appb_compress_encrypt_key: "xRz96aRS5F2XBrz6sJTq"
+appb_is_cold_backup: "False"
+appb_app_name: "splunk"
+appb_app_component_name: "NA"
+appb_app_home: "/opt/splunk/etc"
+appb_service_stop: "/opt/splunk/bin/splunk stop"
+appb_service_start: "/opt/splunk/bin/splunk start"
+appb_bkp_s3_bucket: dr-backups

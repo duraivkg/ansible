@@ -1,0 +1,107 @@
+---
+# tasks file for chef-server
+  - block:
+      - name: fetch fqdn
+        shell: hostname
+        register: hostname
+
+      - name: set facts
+        set_fact:
+            timestamp: "{{ lookup('pipe', 'date -u +%Y%m%d%H%M%S') }}"
+            hostname: "{{ hostname.stdout }}"
+
+      - name: stats for local workspace
+        local_action: stat path={{ local_workspace }}
+        register: local_workspace_stats
+        run_once: true
+
+      - name: stats for remote workspace
+        stat: path={{ remote_workspace }}
+        register: remote_workspace_stats
+        become: yes
+
+      - name: delete local workspace
+        local_action: file path={{ local_workspace }} state=absent
+        when: local_workspace_stats.stat.exists == True
+        run_once: true
+
+      - name: create local workspace
+        local_action: file path={{ local_workspace }} state=directory
+        run_once: true
+
+      - name: delete remote workspace
+        file: path={{ remote_workspace }} state=absent
+        when: remote_workspace_stats.stat.exists == True
+        become: yes
+
+      - name: create remote dirs
+        file: path={{ item }} state=directory
+        with_items:
+            - "{{ remote_workspace }}"
+            - "{{ csb_bkp_data_dir }}"
+        become: yes
+
+      - name: stop chef_server if the backup mode is cold
+        shell: "{{ csb_service_chef_stop }}"
+        when: "{{ csb_is_cold_backup }} == True"
+        become: yes
+
+      - name: backup_set_1 backup the postgres database
+        shell: "{{ csb_bkp_set_1_cmd }}"
+        no_log: true
+        become: yes
+
+      - name: move the postgres database to backup home
+        shell: mv {{ csb_bkp_set_1_initial_dump_file }} {{ csb_bkp_data_dir }}
+        become: yes
+
+      - name: backup_set_2 backup other chef files
+        shell: "{{ csb_bkp_set_2_cmd }}"
+        no_log: true
+        become: yes
+
+      - name: uncopmpress backup_set_2 and delete the postgres files
+        shell: "{{ csb_bkp_set_2_clean_cmd }}"
+        no_log: true
+        become: yes
+
+      - name: create backup set
+        shell: "{{ csb_bkp_set_cmd }}"
+        no_log: true
+        become: yes
+
+      - name: encrypt backup set
+        shell: "cd {{ csb_bkp_data_dir }} && {{ csb_bkp_set_encrypt_cmd }}"
+        no_log: true
+        become: yes
+
+      - name: upload the labeled backup set to s3 if requested
+        s3: bucket={{ csb_bkp_s3_bucket }} object={{ csb_bkp_s3_object_current }} src={{ csb_bkp_set_src }} mode=put
+        when: "{{ csb_publish_to_s3 }} == True"
+        become: yes
+
+      - name: print the footer
+        local_action: debug msg="s3_end_point - chef_standalone_server_backup - https://s3.amazonaws.com/{{ csb_bkp_s3_bucket }}/{{ csb_bkp_s3_object_current }}"
+        when: "{{ csb_publish_to_s3 }} == True"
+        run_once: true
+
+    always:
+      - name: stats for remote workspace
+        stat: path={{ remote_workspace }}
+        register: remote_workspace_stats
+        become: yes
+
+      - name: delete remote workspace
+        file: path={{ remote_workspace }} state=absent
+        when: remote_workspace_stats.stat.exists == True
+        become: yes
+
+      - name: stats for local workspace
+        local_action: stat path={{ local_workspace }}
+        register: local_workspace_stats
+        run_once: true
+
+      - name: delete local workspace
+        local_action: file path={{ local_workspace }} state=absent
+        when: local_workspace_stats.stat.exists == True
+        run_once: true

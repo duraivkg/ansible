@@ -1,0 +1,12 @@
+---
+# vars file for aws/rds/dump
+mysql_dump_list:
+    - name: "rds_1"
+      db_name: "all"
+      login_host:  "mysql.dgcloud.com"
+      login_port: "3306"
+      login_user: "admin"
+      login_password: "admin"
+      single_transaction: "yes"
+      compress_encrypt_key: "xRz96aRS5F2XBrz6sJTq"
+      enabled: True

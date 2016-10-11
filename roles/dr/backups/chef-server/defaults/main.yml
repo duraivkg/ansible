@@ -1,0 +1,30 @@
+---
+# defaults file for chef-server
+local_workspace_param: /tmp/ansible_ws/backups/chef_server
+remote_workspace_param: /opt/local/ansible_ws/backups/chef
+local_workspace: "{{ local_workspace_param }}/{{ timestamp }}"
+remote_workspace: "{{ remote_workspace_param }}/{{ timestamp }}"
+csb_is_cold_backup: "False"
+csb_service_chef_stop: chef-server-ctl stop
+csb_service_chef_start: chef-server-ctl start
+csb_bkp_data_dir: "{{ remote_workspace }}/data"
+csb_bkp_set_1_dump_src: /opt/opscode/embedded/bin/pg_dumpall
+csb_bkp_set_1_dump_name: "chef_postgresql_dump_{{ timestamp }}.tar.gz"
+csb_bkp_set_1_initial_dump_path: /tmp
+csb_bkp_set_1_initial_dump_file: "{{ csb_bkp_set_1_initial_dump_path }}/{{ csb_bkp_set_1_dump_name }}"
+csb_bkp_set_1_cmd: "sudo -E -u opscode-pgsql bash -c \"{{ csb_bkp_set_1_dump_src }} -c | gzip --fast > {{ csb_bkp_set_1_initial_dump_file }}\" && sync"
+csb_bkp_set_2_dump_name: chef_var_opt_opscode_{{ timestamp }}.tar.gz
+csb_bkp_set_2_cmd: "cd {{ csb_bkp_data_dir }} && mkdir -p {{ csb_bkp_data_dir }}/etc_opscode  {{ csb_bkp_data_dir }}/var_opt_opscode && cd {{ csb_bkp_data_dir }}/etc_opscode  && cp -R /etc/opscode . && cd {{ csb_bkp_data_dir }}/var_opt_opscode && cp -R  /var/opt/opscode . && cd {{ csb_bkp_data_dir }} && tar -cvzf {{ csb_bkp_data_dir }}/{{ csb_bkp_set_2_dump_name }} etc_opscode var_opt_opscode"
+csb_bkp_set_2_clean_cmd: "cd {{ csb_bkp_data_dir }} && mkdir -p chef_files && tar -xzf {{ csb_bkp_set_2_dump_name }} -C chef_files && cd chef_files && if [ -d var_opt_opscode/opscode/postgresql/* ]; then rm -rf var_opt_opscode/opscode/postgresql/; fi && tar -czf {{ csb_bkp_set_2_dump_name }} * && mv {{ csb_bkp_set_2_dump_name }} {{ csb_bkp_data_dir }}/{{ csb_bkp_set_2_dump_name }}"
+csb_bkp_set_dump_name: "{{ hostname }}-{{ timestamp }}.tgz"
+csb_bkp_set_cmd: "cd {{ csb_bkp_data_dir }} && tar czfp {{ csb_bkp_set_dump_name }} {{ csb_bkp_set_1_dump_name }} {{ csb_bkp_set_2_dump_name }}"
+csb_bkp_set_enc_file_name: "{{ hostname }}-latest.enc"
+csb_bkp_set_encrypt_cmd: "openssl enc -aes-256-cbc -k {{ csb_compress_encrypt_key }} -salt -in {{ csb_bkp_set_dump_name }} -out {{ csb_bkp_set_enc_file_name }}"
+csb_compress_encrypt_key: "8F4D2C66-011F-483D-BDAF-C7E64DD48F44"
+csb_bkp_set_src: "{{ csb_bkp_data_dir }}/{{ csb_bkp_set_enc_file_name }}"
+csb_bkp_set_dest: "{{ local_workspace }}/{{ csb_bkp_set_enc_file_name }}"
+csb_publish_to_s3: "True"
+csb_bkp_s3_bucket: backups
+csb_bkp_s3_chef_backup_dir: chef/chef_server
+csb_bkp_s3_object: "{{ csb_bkp_s3_chef_backup_dir }}/{{ hostname }}-latest.enc"
+csb_bkp_s3_object_current:  "{{ csb_bkp_s3_chef_backup_dir }}/{{ hostname }}-{{ timestamp }}.enc"

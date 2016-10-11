@@ -1,0 +1,4 @@
+---
+- hosts: localhost
+  roles:
+     - access_management/users

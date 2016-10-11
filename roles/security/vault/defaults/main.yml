@@ -1,0 +1,12 @@
+---
+# defaults file for security/vault
+local_workspace_param: /opt/local/ansible/ansible_ws/vault
+local_workspace: "{{ local_workspace_param }}/{{ timestamp }}"
+vault_dynamic_home: "${ANSIBLE_ROLES}"
+vault_mode: encrypt
+vault_encrypt_mode: dynamic
+vault_dynamic_lf: "{{ local_workspace }}/.lf_file_list.md"
+vault_cmd: "find {{ vault_dynamic_home }} -name main.yml | grep \"vars/\" > {{ vault_dynamic_lf }} && for file in `cat {{ vault_dynamic_lf }}`; do ansible-vault {{ vault_mode }} ${file}; done"
+vault_static_files:
+  - "${ANSIBLE_ROLES}/backups/chef_server/vars/main.yml"
+  - "${ANSIBLE_ROLES}/backups/app/vars/main.yml"

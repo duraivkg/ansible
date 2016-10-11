@@ -1,0 +1,13 @@
+---
+# tasks file for health_checks/app_endpoint
+  - name: perform health_checks
+    uri:
+      url: "{{ item.end_point }}"
+      method: "{{ item.method }}"
+      status_code: "{{ item.status_code }}"
+      validate_certs: "{{ item.validate_certs }}"
+      timeout: "{{ item.timeout }}"
+    when: "{{ item.enabled }}"
+    run_once: true
+    delegate_to: localhost
+    with_items: "{{ app_end_points }}"

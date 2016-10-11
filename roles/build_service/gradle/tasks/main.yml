@@ -1,0 +1,71 @@
+---
+# tasks file for build_service/gradle
+  - block:
+    - name: install packages
+      yum: name={{ item }} state=latest
+      become: yes
+      with_items: "{{ bsg_install_pkg_list }}"
+      when: "{{ bsg_install_pkgs }} == True"
+
+    - name: create soft link for gradle if requested
+      file: state=link
+            path={{ bsg_gradle }}
+            src={{ bsg_gradle_bin }}
+      become: yes
+      when: "{{ bsg_create_sl_gradle }} == True"
+
+    - name: gradle build
+      shell: "cd {{ bsg_offset_dir }} && {{ bsg_cmd }}"
+      register: gradle_build_log
+      run_once: true
+
+    - name: print the gradle_build_log
+      debug: msg={{ gradle_build_log.stdout }}
+      with_items:
+        - "{{ gradle_build_log.stdout }}"
+      when: "{{ bsg_print_build_log }} == True"
+
+    - name: gather the build directory contents
+      local_action: shell ls -ltr {{ bsg_build_dir }}/* chdir={{ bsg_offset_dir }}
+      register: build_dir_contents
+      when: "{{ bsg_print_build_dir_contents }} == True"
+
+    - name: print the build directory contents
+      debug: msg={{  build_dir_contents.stdout }}
+      when: "{{ bsg_print_build_dir_contents }} == True"
+
+    - name: prepare master tar ball
+      shell: "{{ bsg_artifact_master_tar_ball_cmd }}"
+      no_log: true
+      run_once: true
+
+    - name: encrypt artifact
+      shell: "{{ bsg_artifact_encrypt_cmd }}"
+      no_log: true
+      run_once: true
+
+    - name: delete the build - {{ bsg_build_id }} artifact in s3
+      local_action: s3 bucket={{ bsg_artifact_s3_bucket }} object={{ bsg_artifact_s3_object }} mode=delobj
+      when: "{{ bsg_artifact_publish_to_s3 }} == True"
+
+    - name: upload the build - {{ bsg_build_id }} artifact to s3
+      s3: bucket={{ bsg_artifact_s3_bucket }} object={{ bsg_artifact_s3_object }} src={{ bsg_artifact_enc_src }} mode=put
+      when: "{{ bsg_artifact_publish_to_s3 }} == True"
+
+    - name: delete the {{ bsg_build_id_latest }} artifact in s3 latest dir
+      local_action: s3 bucket={{ bsg_artifact_s3_bucket }} object={{ bsg_artifact_s3_object_latest }} mode=delobj
+      when: "{{ bsg_artifact_publish_to_s3 }} == True"
+
+    - name: upload the {{ bsg_build_id_latest }} artifact to s3 latest dir
+      s3: bucket={{ bsg_artifact_s3_bucket }} object={{ bsg_artifact_s3_object_latest }} src={{ bsg_artifact_enc_src }} mode=put
+      when: "{{ bsg_artifact_publish_to_s3 }} == True"
+
+    - name: print the footer - {{ bsg_build_id }}
+      local_action: debug msg="s3_end_point - https://s3.amazonaws.com/{{ bsg_artifact_s3_bucket }}/{{ bsg_artifact_s3_object }}"
+      when: "{{ bsg_artifact_publish_to_s3 }} == True"
+      run_once: true
+
+    - name: print the footer - {{ bsg_build_id_latest }}
+      local_action: debug msg="s3_end_point - https://s3.amazonaws.com/{{ bsg_artifact_s3_bucket }}/{{ bsg_artifact_s3_object_latest }}"
+      when: "{{ bsg_artifact_publish_to_s3 }} == True"
+      run_once: true

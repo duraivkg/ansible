@@ -1,0 +1,75 @@
+---
+# tasks file for roles/aws/ec2/instances/list
+ - block:
+    - name: set timestamp
+      set_fact:
+         timestamp: "{{ lookup('pipe', 'date -u +%Y%m%d%H%M%S') }}"
+      run_once: true
+      delegate_to: localhost
+
+    - name: stats for workspace
+      stat: path={{ local_workspace }}
+      register: local_workspace_stats
+      run_once: true
+
+    - name: delete workspace
+      file: path={{ local_workspace }} state=absent
+      when: ( local_workspace_stats.stat.exists == "True"  and clean_ws == "True" )
+      run_once: true
+
+    - name: create workspace
+      file: path={{ local_workspace }} state=directory
+      run_once: true
+
+    - name: install modules
+      yum: name={{ item }} state=latest
+      become: yes
+      with_items: "{{ ec2_ins_list_pkgs }}"
+      when: ec2_ins_list_install_modules
+
+    - name: gather ec2 facts
+      ec2_remote_facts:
+        region: "{{ item[0] }}"
+        filters:
+          instance-state-name: "{{ item[2] }}"
+          tag:Name: "{{ item[1] }}"
+      register: ec2_facts
+      with_nested:
+        - "{{ ec2_ins_list_region }}"
+        - "{{ ec2_ins_list_host_name_pattern }}"
+        - "{{ ec2_ins_list_ins_state }}"
+
+    - name: create host file
+      template: src={{ ec2_ins_list_dyn_host_file_tpl }} dest={{ ec2_ins_list_dyn_host_file_dest }} mode=0644
+
+    - name: remove white space
+      replace: dest={{ ec2_ins_list_dyn_host_file_dest }} regexp=' ' replace=""
+
+    - name: stats for host file
+      stat: path={{ ec2_ins_list_dyn_host_file_dest }}
+      register: ec2_ins_list_dyn_host_file_dest_stats
+
+    - name: gather {{ ec2_ins_list_dyn_host_file_dest }} stats
+      shell: l_count=`cat {{ ec2_ins_list_dyn_host_file_dest }} | wc -l`; if [[ "${l_count}" -le "1" ]]; then exit 1; fi
+      when:  ec2_ins_list_dyn_host_file_dest_stats.stat.exists == True
+
+   rescue:
+      - debug: msg="no matching host found for {{ ec2_ins_list_host_name_pattern }} | {{ ec2_ins_list_region }}"
+
+      - file: path={{ ec2_ins_list_dyn_host_file_dest }} state=absent
+
+      - fail: msg="process failure"
+
+   always:
+      - name: stats for host file
+        stat: path={{ ec2_ins_list_dyn_host_file_dest }}
+        register: ec2_ins_list_dyn_host_file_dest_stats
+
+      - name: gather the host file contents
+        shell: cat {{ ec2_ins_list_dyn_host_file_dest }}
+        register: ec2_ins_list_dyn_host_file_dest_contents
+        when:  ec2_ins_list_dyn_host_file_dest_stats.stat.exists == True
+
+      - name: print the host file  {{ ec2_ins_list_dyn_host_file_dest }} contents
+        debug: msg={{  ec2_ins_list_dyn_host_file_dest_contents.stdout_lines }}
+        when:  ec2_ins_list_dyn_host_file_dest_stats.stat.exists == True

@@ -1,0 +1,50 @@
+---
+# defaults file for rds/dump
+local_workspace_param: /tmp/ansible_ws/aws/rds/dump
+remote_workspace_param: /opt/local/ansible_ws/aws/rds/dump
+local_workspace: "{{ local_workspace_param }}/{{ timestamp }}"
+remote_workspace: "{{ remote_workspace_param }}/{{ timestamp }}"
+mysql_dump_pkg_list_csv: "mysql,python-boto,MySQL-python"
+mysql_dump_list_pkgs: "{{ mysql_dump_pkg_list_csv.split(',') }}"
+global_log_dir: "/opt/local/logs/ansible/"
+global_log_file: "{{ global_log_dir }}/{{ mysql_dump_log_fn }}"
+build_id: "na"
+app_user: "ansible"
+app_group: "ansible"
+mysql_dump_command: "dump"
+mysql_dump_name: "{{ item.name }}.sql"
+mysql_dump_enc_file_name: "{{ item.name }}.enc"
+mysql_dump_login_host: "mysql.dgcoud.com"
+mysql_dump_db_name: "all"
+mysql_dump_state: "dump"
+mysql_dump_single_transaction: "yes"
+mysql_dump_username: "tbd"
+mysql_dump_password: "tbd"
+mysql_dump_data_dir: "{{ remote_workspace }}/data"
+mysql_dump_set_raw_src: "{{ mysql_dump_data_dir }}/{{ mysql_dump_name }}"
+mysql_dump_compressed_file_src: "{{ mysql_dump_data_dir }}/{{ item.name }}.tgz"
+mysql_compress_encrypt_key: "{{ item.compress_encrypt_key }}"
+mysql_dump_set_enc_src: "{{ mysql_dump_data_dir }}/{{ mysql_dump_enc_file_name }}"
+mysql_dump_set_encrypt_cmd: "openssl enc -aes-256-cbc -k {{ mysql_compress_encrypt_key }} -salt -in {{ mysql_dump_compressed_file_src }} -out {{ mysql_dump_set_enc_src }}"
+mysql_dump_publish_to_s3: "True"
+mysql_dump_s3_bucket: "rds-backups"
+mysql_dump_s3_dump_dir_base: "rds/mysql"
+mysql_dump_s3_dump_dir: "{{ mysql_dump_s3_dump_dir_base }}/{{ item.name }}"
+mysql_dump_s3_object: "{{ mysql_dump_s3_dump_dir }}/{{ item.name }}-latest.enc"
+mysql_dump_s3_object_current:  "{{ mysql_dump_s3_dump_dir }}/{{ item.name }}-{{ timestamp }}.enc"
+mysql_dump_process_log_cmd: "echo timestamp=`date +%m%d%Y%S` build_id={{ build_id }} status=success name=`basename {{ item.path  }} .sql` size={{ item.size }} unit=bytes >> {{ mysql_dump_log }}"
+mysql_dump_log_fn: "mysql_dump.log"
+mysql_dump_log: "{{ remote_workspace }}/{{ mysql_dump_log_fn }}"
+
+# please use the global vars file located under ansible/vars/aws/rds/*mysql*.yml to drive the env specific dump properties
+mysql_dump_list:
+    - name: "tbd"
+      db_name: "all"
+      login_host:  "mysql.dgcloud.com"
+      login_port: "3306"
+      login_user: "admin"
+      login_password: "admin"
+      single_transaction: "yes"
+      compress_encrypt_key: "xRz96aRS5F2XBrz6sJTq"
+      enabled: True
+

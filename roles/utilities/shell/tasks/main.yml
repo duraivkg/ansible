@@ -1,0 +1,158 @@
+---
+# tasks file for utilities/shell
+  - block:
+        - name: fetch timestamp
+          local_action: shell date +%Y%m%d%H%M
+          register: timestamp
+
+        - name: set facts
+          set_fact:
+               local_timestamp: "{{ timestamp.stdout }}"
+               local_workspace: "{{ local_workspace_param }}/{{ timestamp.stdout }}"
+               remote_workspace: "{{ remote_workspace_param }}/{{ timestamp.stdout }}"
+          run_once: true
+
+        - name: stats for local workspace
+          local_action: stat path={{ local_workspace }}
+          register: local_workspace_stats
+          run_once: true
+
+        - name: stats for remote workspace
+          local_action: stat path={{ remote_workspace }}
+          register: remote_workspace_stats
+
+        - name: delete local workspace
+          file: path={{ remote_workspace }} state=absent
+          when: local_workspace_stats.stat.exists == True
+          run_once: true
+
+        - name: create local workspace {{ local_workspace }}
+          local_action: file path={{ local_workspace }} state=directory
+          run_once: true
+
+        - name: delete remote workspace
+          file: path={{ remote_workspace }} state=absent
+          when: remote_workspace_stats.stat.exists == True
+
+        - name: create remote dirs
+          file: path={{ item }} state=directory
+          with_items:
+              - "{{ remote_workspace }}"
+
+        - name: install the packages
+          yum: name={{ item }} state=present
+          with_items:
+            - "{{ util_shell_pkg_list }}"
+            -  python-boto
+          tags: [packages]
+          become: yes
+
+        - name: locate the files to be copied to remote ws {{ util_shell_cp_file_src_offset_dir }} - {{ util_shell_cp_file_src_pattern }}
+          find: paths="{{ util_shell_cp_file_src_offset_dir }}" patterns="{{ util_shell_cp_file_src_pattern }}" recurse=yes
+          no_log: True
+          register: util_shell_cp_file_list
+          become: yes
+
+        - name: copy the files to remote workspace
+          copy: src={{ item.path }} dest={{ remote_workspace }} mode="u=rw,g=r,o=r"
+          no_log: True
+          when: util_shell_cp_files
+          with_items:
+            - "{{ util_shell_cp_file_list.files }}"
+          become: yes
+
+        - name: execute shell caller - {{ util_shell_as_caller }}
+          shell: "{{ util_shell_as_caller }}"
+          become: "{{ util_shell_become }}"
+
+        - name: locate the files to be copied from remote {{ util_shell_cp_out_file_offset_dir }} - {{ util_shell_cp_out_file_list_pattern }}
+          find: paths="{{ util_shell_cp_out_file_offset_dir }}" patterns="{{ util_shell_cp_out_file_list_pattern }}" recurse=yes
+          no_log: True
+          register: util_shell_cp_out_file_list
+          become: yes
+
+        - name: set file names
+          shell: basename {{ item.path }}
+          register: util_shell_cp_out_file_names
+          when: util_shell_cp_out_files
+          no_log: True
+          with_items:
+              - "{{ util_shell_cp_out_file_list.files }}"
+
+        - name: copy the files to local workspace
+          fetch: src={{ item[0].path }} dest={{ local_workspace }}/{{ item[1].stdout_lines[0] }} flat=yes fail_on_missing=yes
+          when: util_shell_cp_out_files
+          no_log: True
+          with_nested:
+            - "{{ util_shell_cp_out_file_list.files }}"
+            - "{{ util_shell_cp_out_file_names.results }}"
+          become: yes
+
+        - name: locate the files to be uploaded to s3 from  {{ util_shell_s3_file_offset_dir }} - {{ util_shell_s3_file_list_pattern }}
+          find: paths="{{ util_shell_s3_file_offset_dir }}" patterns="{{ util_shell_s3_file_list_pattern }}" recurse=yes
+          no_log: True
+          register: util_shell_s3_file_list
+          become: yes
+
+        - name: set s3 file names
+          shell: basename {{ item.path }}
+          register: util_shell_s3_file_names
+          when: util_shell_publish_to_s3
+          no_log: True
+          with_items:
+              - "{{ util_shell_s3_file_list.files }}"
+
+        - name: delete the build - {{ util_shell_build_id }} artifact
+          local_action: s3 bucket={{ util_shell_s3_bucket }} object={{ util_shell_s3_object }} mode=delobj
+          no_log: True
+          when: util_shell_publish_to_s3
+          with_nested:
+              - "{{ util_shell_s3_file_list.files }}"
+              - "{{ util_shell_s3_file_names.results }}"
+          become: yes
+
+        - name: upload files to s3 if requested
+          local_action: s3 bucket={{ util_shell_s3_bucket }} object={{ util_shell_s3_object }} src={{ util_shell_s3_src_file }} mode=put
+          no_log: True
+          when: util_shell_publish_to_s3
+          with_nested:
+              - "{{ util_shell_s3_file_list.files }}"
+              - "{{ util_shell_s3_file_names.results }}"
+          become: yes
+
+        - name: gather s3 endpoints to a file
+          local_action: shell echo https://s3.amazonaws.com/{{ util_shell_s3_bucket }}/{{ util_shell_s3_object }} > {{ local_workspace }}/s3_endpoints.log
+          no_log: True
+          when: util_shell_publish_to_s3
+          with_nested:
+              - "{{ util_shell_s3_file_list.files }}"
+              - "{{ util_shell_s3_file_names.results }}"
+
+        - name: gather s3 endpoints
+          local_action: shell cat {{ local_workspace }}/s3_endpoints.log
+          register: s3_endpoints_log
+          no_log: True
+          when: util_shell_publish_to_s3
+
+        - name: print s3 endpoints
+          debug: msg={{  s3_endpoints_log.stdout_lines }}
+          when: util_shell_publish_to_s3
+
+    always:
+      - name: stats for process log
+        stat: path={{ util_shell_process_log_file }}
+        register: util_shell_process_log_file_stats
+        become: yes
+
+      - name: copy the process log to {{ local_workspace }}/{{ util_shell_process_log_fn }}
+        fetch: src={{ util_shell_process_log_file }} dest={{ local_workspace }}/{{ util_shell_process_log_fn }} flat=yes fail_on_missing=yes
+        when: util_shell_process_log_file_stats.stat.exists == True
+        become: yes
+
+      - name: stats for remote workspace
+        stat: path={{ remote_workspace }}
+        register: remote_workspace_stats
+
+      - name: delete remote workspace
+        file: path={{ remote_workspace }} state=absent
+        when: ( remote_workspace_stats.stat.exists == True and {{ util_shell_delete_remote_ws }} == True )

@@ -1,0 +1,11 @@
+---
+# defaults file for access_management/users
+am_users_groups_list_csv: "jenkins,ansible"
+am_users_groups_list:  "{{ am_users_groups_list_csv.split(',') }}"
+am_users_user_list_csv: "jenkins,ansible"
+am_users_user_list:  "{{ am_users_user_list_csv.split(',') }}"
+am_users_user_shell: "/bin/bash"
+am_users_user_state: "present"
+am_users_group_state: "present"
+am_users_lock_user: True
+am_users_disable_pwd_expiry: True
