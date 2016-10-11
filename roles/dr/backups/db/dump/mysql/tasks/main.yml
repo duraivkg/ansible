@@ -1,0 +1,142 @@
+---
+  - block:
+      - name: set timestamp
+        set_fact:
+           timestamp: "{{ lookup('pipe', 'date -u +%Y%m%d%H%M%S') }}"
+        run_once: true
+        delegate_to: localhost
+
+      - name: stats for local workspace
+        local_action: stat path={{ local_workspace }}
+        register: local_workspace_stats
+        run_once: true
+
+      - name: delete local workspace
+        local_action: file path={{ local_workspace }} state=absent
+        when: local_workspace_stats.stat.exists == True
+        run_once: true
+
+      - name: create local workspace
+        local_action: file path={{ local_workspace }} state=directory
+        run_once: true
+        become: no
+
+      - name: stats for remote workspace
+        stat: path={{ remote_workspace }}
+        register: remote_workspace_stats
+        become: yes
+
+      - name: delete remote workspace
+        file: path={{ remote_workspace }} state=absent
+        when: remote_workspace_stats.stat.exists == True
+        become: yes
+
+      - name: create remote dirs
+        file: path={{ item }} state=directory
+        with_items:
+            - "{{ remote_workspace }}"
+            - "{{ mysql_dump_data_dir }}"
+        become: yes
+
+      - name: create gloabl dirs
+        file: path={{ item }} state=directory mode="0755" owner={{ app_user }} group={{ app_group }}
+        with_items:
+            - "{{ global_log_dir }}"
+        become: yes
+
+      - name: install modules
+        yum: name={{ item }} state=latest
+        become: yes
+        with_items: "{{ mysql_dump_list_pkgs }}"
+
+      - name: export db to dump
+        mysql_db: login_host={{ item.login_host }} login_port={{ item.login_port }} name={{ item.db_name }} login_user={{ item.login_user }} login_password={{ item.login_password }} state={{ mysql_dump_state }} single_transaction={{ item.single_transaction }} target={{ mysql_dump_set_raw_src }}
+        no_log: true
+        become: yes
+        with_items: "{{ mysql_dump_list }}"
+
+      - name: lookup dump files
+        find: paths="{{ mysql_dump_data_dir }}" patterns="*.sql"
+        register: dump_file_stats
+        become: yes
+
+      - name: create process log file
+        shell: "{{ mysql_dump_process_log_cmd }}"
+        no_log: true
+        become: yes
+        with_items:
+          - "{{ dump_file_stats.files }}"
+
+      - name: compress the dump file
+        shell: "cd {{ mysql_dump_data_dir }} && tar -czf {{ mysql_dump_compressed_file_src }} {{ item.name }}.sql"
+        no_log: true
+        become: yes
+        with_items: "{{ mysql_dump_list }}"
+
+      - name: encrypt backup set
+        shell: "{{ mysql_dump_set_encrypt_cmd }}"
+        no_log: true
+        become: yes
+        with_items: "{{ mysql_dump_list }}"
+
+      - name: delete the unencrypted file
+        file: path={{ mysql_dump_set_raw_src }} state=absent
+        no_log: true
+        become: yes
+        with_items: "{{ mysql_dump_list }}"
+
+      - name: upload the labeled backup set to s3 if requested
+        s3: bucket={{ mysql_dump_s3_bucket }} object={{ mysql_dump_s3_object_current }} src={{ mysql_dump_set_enc_src }} mode=put
+        no_log: true
+        when: "{{ mysql_dump_publish_to_s3 }} == True"
+        with_items: "{{ mysql_dump_list }}"
+        become: yes
+
+      - name: print the footer
+        local_action: debug msg="s3_end_point - backup - https://s3.amazonaws.com/{{ mysql_dump_s3_bucket }}/{{ mysql_dump_s3_dump_dir_base }}"
+        when: "{{ mysql_dump_publish_to_s3 }} == True"
+        run_once: true
+
+    rescue:
+      - name: create process log file
+        shell: echo timestamp=`date +%m%d%Y%S` build_id={{ build_id }} status=failure  >> {{ mysql_dump_log }}
+        become: yes
+        no_log: true
+
+      - fail: msg="process failure"
+
+    always:
+      - name: stats for process log
+        stat: path={{ mysql_dump_log }}
+        register: mysql_dump_log_stats
+        become: yes
+
+      - name: copy the process log
+        fetch: src={{ mysql_dump_log }} dest={{ local_workspace }}/{{ mysql_dump_log_fn }} flat=yes fail_on_missing=yes
+        when: mysql_dump_log_stats.stat.exists == True
+        become: yes
+
+      - name: stats for global log dir
+        stat: path={{ global_log_dir }}
+        register: mysql_dump_global_log_dir_stats
+        become: yes
+
+      - name: append the process log contents to global log file {{ global_log_file }}
+        shell: cat {{ mysql_dump_log }} >> {{ global_log_file }}
+        when: ( mysql_dump_global_log_dir_stats.stat.exists == True and mysql_dump_log_stats.stat.exists == True )
+        become: yes
+
+      - name: set permissions for process log file
+        file: path="{{ global_log_file }}" state=file mode="0755" owner={{ app_user }} group={{ app_group }}
+        when: mysql_dump_log_stats.stat.exists == True
+        become: yes
+
+      - name: stats for remote workspace
+        stat: path={{ remote_workspace }}
+        register: remote_workspace_stats
+        become: yes
+
+      - name: delete remote workspace
+        file: path={{ remote_workspace }} state=absent
+        when: remote_workspace_stats.stat.exists == True
+        become: yes

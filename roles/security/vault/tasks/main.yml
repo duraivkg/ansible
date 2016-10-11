@@ -1,0 +1,49 @@
+---
+  - block:
+      - name: fetch timestamp
+        local_action: shell date +%Y%m%d%H%M
+        register: timestamp
+
+      - name: set facts
+        set_fact:
+             timestamp: "{{ timestamp.stdout }}"
+        run_once: true
+
+      - name: stats for local workspace
+        stat: path={{ local_workspace }}
+        register: local_workspace_stats
+        run_once: true
+
+      - name: delete local workspace
+        file: path={{ local_workspace }} state=absent
+        when: local_workspace_stats.stat.exists == True
+        run_once: true
+
+      - name: create dirs
+        file: path={{ item }} state=directory
+        with_items:
+            - "{{ local_workspace }}"
+
+      - name: encrypt/decrypt files dynamic
+        shell: "{{ vault_cmd }}"
+        no_log: true
+        when: vault_encrypt_mode == "dynamic"
+        run_once: true
+
+      - name: encrypt/decrypt files static
+        shell: "ansible-vault {{ vault_mode }} {{ item }}"
+        no_log: true
+        when: vault_encrypt_mode == "static"
+        run_once: true
+        with_items: "{{ vault_static_files }}"
+
+    always:
+      - name: stats for local workspace
+        stat: path={{ local_workspace }}
+        register: local_workspace_stats
+        run_once: true
+
+      - name: delete local workspace
+        file: path={{ local_workspace }} state=absent
+        when: local_workspace_stats.stat.exists == True
+        run_once: true

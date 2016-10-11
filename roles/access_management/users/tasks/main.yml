@@ -1,0 +1,20 @@
+---
+# tasks file for access_management/users
+  - block:
+      - name: add group
+        group: name={{ item }} state={{ am_users_group_state }}
+        with_items: "{{ am_users_groups_list }}"
+
+      - name: add user(s)
+        user: name={{ item }} shell={{ am_users_user_shell }} group={{ item }} state={{ am_users_user_state }}
+        with_items: "{{ am_users_user_list }}"
+
+      - name: lock user(s)
+        command: usermod --lock {{ item }}
+        with_items:  "{{ am_users_user_list }}"
+        when: am_users_lock_user
+
+      - name: disable password expiry if requested
+        shell: chage -I -1 -m 0 -M 99999 -E -1 {{ item }}
+        with_items:  "{{ am_users_user_list }}"
+        when: am_users_disable_pwd_expiry

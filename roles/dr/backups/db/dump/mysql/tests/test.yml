@@ -1,0 +1,6 @@
+---
+- hosts: localhost
+  remote_user: root
+  roles:
+    - access_management/users
+    - backups/db/dump/mysql

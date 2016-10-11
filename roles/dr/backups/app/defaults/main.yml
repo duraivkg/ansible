@@ -1,0 +1,27 @@
+---
+# defaults file for dr/backups/app
+local_workspace_param: /tmp/ansible_ws/dr/backups/splunk/
+remote_workspace_param: /opt/local/ansible_ws/dr/backups/splunk/
+local_workspace: "{{ local_workspace_param }}/{{ timestamp }}"
+remote_workspace: "{{ remote_workspace_param }}/{{ timestamp }}"
+delete_remote_ws: "False"
+appb_dumps_dir: "{{ remote_workspace }}/dumps"
+appb_is_cold_backup: "False"
+appb_app_name: "splunk"
+appb_app_component_name: "NA"
+appb_app_home: "/opt/splunk/etc"
+appb_service_stop: "hostname"
+appb_service_start: "hostname"
+appb_dump_name: "{{ appb_app_name }}_{{ timestamp }}.tgz"
+appb_bkp_set_dump_name: "{{ appb_dump_name }}"
+appb_bkp_set_enc_file_name: "{{ appb_app_name }}_{{ timestamp }}.enc"
+appb_bkp_set_cmd: "cd {{ appb_app_home }} && touch {{ appb_dumps_dir }}/{{ appb_dump_name }} && tar -czf {{ appb_dumps_dir }}/{{ appb_dump_name }} *"
+appb_bkp_set_encrypt_cmd: "openssl enc -aes-256-cbc -k {{ appb_compress_encrypt_key }} -salt -in {{ appb_bkp_set_dump_name }} -out {{ appb_dumps_dir }}/{{ appb_bkp_set_enc_file_name }}"
+appb_compress_encrypt_key: "xRz96aRS5F2XBrz6sJTq"
+appb_bkp_set_src: "{{ appb_dumps_dir }}/{{ appb_bkp_set_enc_file_name }}"
+appb_bkp_set_dest: "{{ local_workspace }}/{{ appb_bkp_set_enc_file_name }}"
+appb_publish_to_s3: "False"
+appb_bkp_s3_bucket: dr-backups
+appb_bkp_s3_backup_dir: "{{ appb_app_name }}"
+appb_bkp_s3_object: "{{ appb_bkp_s3_backup_dir }}/{{ hostname }}-latest.enc"
+appb_bkp_s3_object_current:  "{{ appb_bkp_s3_backup_dir }}/{{ hostname }}-{{ timestamp }}.enc"

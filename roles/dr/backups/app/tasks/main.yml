@@ -1,0 +1,95 @@
+---
+# tasks file for dr/backups/app
+  - block:
+      - name: fetch fqdn
+        shell: hostname
+        register: hostname
+
+      - name: set facts
+        set_fact:
+           timestamp: "{{ lookup('pipe', 'date -u +%Y%m%d%H%M%S') }}"
+           hostname: "{{ hostname.stdout }}"
+
+      - name: set appb_bkp_s3_bucket
+        set_fact:
+           appb_bkp_s3_backup_dir: "{{ appb_bkp_s3_backup_dir }}/{{ appb_app_component_name }}"
+        when: appb_app_component_name != "NA"
+
+      - name: stats for local workspace
+        local_action: stat path={{ local_workspace }}
+        register: local_workspace_stats
+        run_once: true
+
+      - name: delete local workspace
+        local_action: file path={{ local_workspace }} state=absent
+        when: local_workspace_stats.stat.exists == True
+        run_once: true
+
+      - name: create local workspace
+        local_action: file path={{ local_workspace }} state=directory
+        run_once: true
+
+      - name: stats for remote workspace
+        stat: path={{ remote_workspace }}
+        register: remote_workspace_stats
+        become: yes
+
+      - name: delete remote workspace
+        file: path={{ remote_workspace }} state=absent
+        when: remote_workspace_stats.stat.exists == True
+        become: yes
+
+      - name: create remote dirs
+        file: path={{ item }} state=directory
+        with_items:
+            - "{{ remote_workspace }}"
+            - "{{ appb_dumps_dir }}"
+        become: yes
+
+      - name: stop app if the backup mode is cold
+        shell: "{{ appb_service_stop }}"
+        when: "{{ appb_is_cold_backup }} == True"
+        become: yes
+
+      - name: backup the app home
+        shell: "{{ appb_bkp_set_cmd }}"
+        become: yes
+
+      - name: start app if the backup mode is cold
+        shell: "{{ appb_service_start }}"
+        when: "{{ appb_is_cold_backup }} == True"
+        become: yes
+
+      - name: encrypt backup set - {{ appb_bkp_set_src }}
+        shell: "cd {{ appb_dumps_dir }} && {{ appb_bkp_set_encrypt_cmd }}"
+        become: yes
+
+      - name: upload the labeled backup set to s3 if requested
+        s3: bucket={{ appb_bkp_s3_bucket }} object={{ appb_bkp_s3_object_current }} src={{ appb_bkp_set_src }} mode=put
+        when: "{{ appb_publish_to_s3 }} == True"
+        become: yes
+
+      - name: print the footer
+        local_action: debug msg="s3_end_point - {{appb_app_name}}_backup - https://s3.amazonaws.com/{{ appb_bkp_s3_bucket }}/{{ appb_bkp_s3_object_current }}"
+        when: "{{ appb_publish_to_s3 }} == True"
+
+    always:
+      - name: stats for remote workspace
+        stat: path={{ remote_workspace }}
+        register: remote_workspace_stats
+        become: yes
+
+      - name: delete remote workspace
+        file: path={{ remote_workspace }} state=absent
+        when: ( remote_workspace_stats.stat.exists == True and {{ delete_remote_ws }} == True )
+        become: yes
+
+      - name: stats for local workspace
+        local_action: stat path={{ local_workspace }}
+        register: local_workspace_stats
+        run_once: true
+
+      - name: delete local workspace
+        local_action: file path={{ local_workspace }} state=absent
+        when: local_workspace_stats.stat.exists == True
+        run_once: true

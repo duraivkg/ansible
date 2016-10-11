@@ -1,0 +1,18 @@
+---
+# defaults file for roles/aws/ec2/instances/list
+ansible_python_interpreter: "/usr/bin/env python"
+local_workspace_param: /tmp/ansible_ws/aws/instances/list
+local_workspace: "{{ local_workspace_param }}/{{ timestamp }}"
+ec2_ins_list_domain_name: ".qa.com"
+ec2_ins_list_dyn_host_file_tpl: "dynamic_inventory.j2"
+ec2_ins_list_dyn_host_file_dest: "{{ local_workspace}}/dynamic_inventory"
+ec2_ins_list_install_modules: false
+clean_ws: false
+ec2_ins_list_region_csv:  "us-east-1,us-west-1,us-west-2,ap-northeast-2,ap-southeast-1,ap-southeast-2,ap-northeast-1,eu-central-1,eu-west-1,sa-east-1"
+ec2_ins_list_region: "{{ ec2_ins_list_region_csv.split(',') }}"
+ec2_ins_list_host_name_pattern_csv: "*apiproxy*,*stable*,*continuous*"
+ec2_ins_list_host_name_pattern: "{{ ec2_ins_list_host_name_pattern_csv.split(',') }}"
+ec2_ins_list_pkg_list_csv: "python-boto"
+ec2_ins_list_pkgs: "{{ ec2_ins_list_pkg_list_csv.split(',') }}"
+ec2_ins_list_ins_state_csv: "running"
+ec2_ins_list_ins_state: "{{ ec2_ins_list_ins_state_csv.split(',') }}"

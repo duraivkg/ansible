@@ -1,0 +1,6 @@
+[ all ]
+{% for item in ec2_facts.results %}
+    {% for instance in  item.instances %}
+        {{ instance.tags.Name }}{{ ec2_ins_list_domain_name }}
+    {% endfor %}
+{% endfor %}

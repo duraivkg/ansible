@@ -1,0 +1,105 @@
+---
+# tasks file for s3/b2b_sync
+- block:
+    - name: set timestamp
+      set_fact:
+         timestamp: "{{ lookup('pipe', 'date -u +%Y%m%d%H%M%S') }}"
+      run_once: true
+      delegate_to: localhost
+
+    - name: stats for local workspace
+      local_action: stat path={{ local_workspace }}
+      register: local_workspace_stats
+      run_once: true
+
+    - name: delete local workspace
+      local_action: file path={{ local_workspace }} state=absent
+      when: local_workspace_stats.stat.exists == True
+      run_once: true
+
+    - name: create local workspace
+      local_action: file path={{ local_workspace }} state=directory
+      run_once: true
+      become: no
+
+    - name: stats for remote workspace
+      stat: path={{ remote_workspace }}
+      register: remote_workspace_stats
+      become: yes
+
+    - name: delete remote workspace
+      file: path={{ remote_workspace }} state=absent
+      when: remote_workspace_stats.stat.exists == True
+      become: yes
+
+    - name: create remote dirs
+      file: path={{ item }} state=directory
+      with_items:
+          - "{{ remote_workspace }}"
+      become: yes
+
+    - name: create gloabl dirs
+      file: path={{ item }} state=directory mode="0755" owner={{ app_user }} group={{ app_group }}
+      with_items:
+          - "{{ global_log_dir }}"
+      become: yes
+
+    - name: copy the sync botstrap script
+      copy: src={{ s3_sync_bs }} dest={{ remote_workspace }} mode="u=rw,g=r,o=r"
+      become: yes
+
+    - name: execute sync botstrap script using local s3 sync list {{ s3_sync_bs_caller }}
+      shell: "cd {{ remote_workspace }} && {{ s3_sync_bs_caller }}"
+      no_log: true
+      when: "{{ s3_sync_b2b_list_global }} == False"
+      become: yes
+
+    - name: execute sync botstrap script using global s3 sync list {{ s3_sync_bs_global_caller }}
+      shell: "cd {{ remote_workspace }} && {{ s3_sync_bs_global_caller }}"
+      no_log: true
+      when: "{{ s3_sync_b2b_list_global }} == True"
+      with_items: "{{ s3_sync_b2b_list }}"
+      become: yes
+
+  rescue:
+    - name: rescue - create process log file
+      shell: echo timestamp=`date +%m%d%Y%S` build_id={{ build_id }} status=failure  >> {{ s3_sync_bs_log_file }}
+      become: yes
+      no_log: true
+
+    - fail: msg="process failure"
+
+  always:
+    - name: stats for process log
+      stat: path={{ s3_sync_bs_log_file }}
+      register: s3_sync_bs_log_file_stats
+      become: yes
+
+    - name: copy the process log
+      fetch: src={{ s3_sync_bs_log_file }} dest={{ local_workspace }}/{{ s3_sync_bs_log_fn }} flat=yes fail_on_missing=yes
+      when: s3_sync_bs_log_file_stats.stat.exists == True
+      become: yes
+
+    - name: stats for global log dir
+      stat: path={{ global_log_dir }}
+      register: s3_sync_global_log_dir_stats
+      become: yes
+
+    - name: append the process log contents to global log file {{ global_log_file }}
+      shell: cat {{ s3_sync_bs_log_file }} >> {{ global_log_file }}
+      when: ( s3_sync_global_log_dir_stats.stat.exists == True and s3_sync_bs_log_file_stats.stat.exists == True )
+      become: yes
+
+    - name: print the log file path
+      debug: msg="log file is in {{ local_workspace }}/{{ s3_sync_bs_log_fn }}"
+      when: s3_sync_bs_log_file_stats.stat.exists == True
+
+    - name: stats for remote workspace
+      stat: path={{ remote_workspace }}
+      register: remote_workspace_stats
+      become: yes
+
+    - name: delete remote workspace
+      file: path={{ remote_workspace }} state=absent
+      when: remote_workspace_stats.stat.exists == True
+      become: yes
